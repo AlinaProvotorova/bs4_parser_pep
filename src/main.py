@@ -6,6 +6,7 @@ from urllib.parse import urljoin
 import requests_cache
 from tqdm import tqdm
 
+<<<<<<< HEAD
 from constants import \
     MAIN_DOC_URL, \
     PEP_URL, \
@@ -13,6 +14,9 @@ from constants import \
     DOWNLOADS_DIR, \
     LOGS, \
     INFO_LOG
+=======
+from constants import MAIN_DOC_URL, PEP_URL, EXPECTED_STATUS, DOWNLOADS_DIR, LOGS, INFO_LOG
+>>>>>>> 98dbbf3a537b2d978a1ff1171269d86d159fcab3
 from configs import configure_argument_parser, configure_logging
 from outputs import control_output
 from utils import get_response, find_tag, get_soup
@@ -130,11 +134,15 @@ def pep(session):
         if tag_abbr.text in EXPECTED_STATUS[status]:
             status_count[tag_abbr.text] += 1
         else:
+<<<<<<< HEAD
             INFO_LOG.append(
                 (urljoin(PEP_URL, href),
                  tag_abbr.text,
                  *EXPECTED_STATUS[status])
             )
+=======
+            INFO_LOG.append((urljoin(PEP_URL, href), tag_abbr.text, *EXPECTED_STATUS[status]))
+>>>>>>> 98dbbf3a537b2d978a1ff1171269d86d159fcab3
 
     return [
         ('Статус', 'Количество'),
