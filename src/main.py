@@ -10,9 +10,9 @@ from constants import \
     MAIN_DOC_URL, \
     PEP_URL, \
     EXPECTED_STATUS, \
-    DOWNLOADS_DIR, \
     LOGS, \
-    INFO_LOG
+    INFO_LOG,\
+    BASE_DIR
 from configs import configure_argument_parser, configure_logging
 from outputs import control_output
 from utils import get_response, find_tag, get_soup
@@ -95,6 +95,7 @@ def download(session):
 
     filename = archive_url.split('/')[-1]
 
+    DOWNLOADS_DIR = BASE_DIR / 'downloads'
     DOWNLOADS_DIR.mkdir(exist_ok=True)
     archive_path = DOWNLOADS_DIR / filename
 
