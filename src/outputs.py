@@ -6,17 +6,6 @@ from prettytable import PrettyTable
 from constants import DATETIME_FORMAT, RESULTS_DIR
 
 
-# def control_output(results, cli_args):
-#     output = cli_args.output
-#     CLI_ARGS[output](results, cli_args)
-#     # if output == 'pretty':
-#     #     pretty_output(results)
-#     # elif output == 'file':
-#     #     file_output(results, cli_args)
-#     # else:
-#     #     default_output(results)
-
-
 def default_output(results, *args):
     for row in results:
         print(*row)
