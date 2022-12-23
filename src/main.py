@@ -1,12 +1,18 @@
+from collections import defaultdict
+import logging
 import re
 from urllib.parse import urljoin
-from collections import defaultdict
 
-import logging
 import requests_cache
 from tqdm import tqdm
 
-from constants import MAIN_DOC_URL, PEP_URL, EXPECTED_STATUS, DOWNLOADS_DIR, INFO
+from constants import \
+    MAIN_DOC_URL, \
+    PEP_URL, \
+    EXPECTED_STATUS, \
+    DOWNLOADS_DIR, \
+    LOGS, \
+    INFO_LOG
 from configs import configure_argument_parser, configure_logging
 from outputs import control_output
 from utils import get_response, find_tag, get_soup
@@ -77,7 +83,11 @@ def download(session):
 
     soup = get_soup(response)
 
-    table_tag = find_tag(soup, 'table', {'class': 'docutils'})
+    table_tag = find_tag(
+        soup,
+        'table',
+        {'class': 'docutils'}
+    )
     pdf_a4_tag = find_tag(table_tag, 'a',
                           {'href': re.compile(r'.+pdf-a4\.zip$')})
     pdf_a4_link = pdf_a4_tag['href']
@@ -93,11 +103,10 @@ def download(session):
     with open(archive_path, 'wb') as file:
         file.write(response.content)
 
-    logging.info(f'Архив был загружен и сохранён: {archive_path}')
+    INFO_LOG.append((archive_path,))
 
 
 def pep(session):
-    info = []
     response = get_response(session, PEP_URL)
     soup = get_soup(response)
     pep_content = find_tag(soup, 'section', {'id': 'pep-content'})
@@ -121,19 +130,17 @@ def pep(session):
         if tag_abbr.text in EXPECTED_STATUS[status]:
             status_count[tag_abbr.text] += 1
         else:
-            info.append((urljoin(PEP_URL, href), tag_abbr.text, EXPECTED_STATUS[status]))
-            # info = f'Несовпадающие статусы: \n' \
-            #        f'{urljoin(PEP_URL, href)} \n' \
-            #        f'Статус в карточке: {tag_abbr.text} \n' \
-            #        f'Ожидаемые статусы: {EXPECTED_STATUS[status]}'
-
-    # logging.info(INFO)
+            INFO_LOG.append(
+                (urljoin(PEP_URL, href),
+                 tag_abbr.text,
+                 *EXPECTED_STATUS[status])
+            )
 
     return [
         ('Статус', 'Количество'),
         *status_count.items(),
         ('Total', sum(status_count.values())),
-    ], info
+    ]
 
 
 MODE_TO_FUNCTION = {
@@ -159,16 +166,19 @@ def main():
 
         parser_mode = args.mode
 
-        results, info = MODE_TO_FUNCTION[parser_mode](session)
+        results = MODE_TO_FUNCTION[parser_mode](session)
 
         if results is not None:
             control_output(results, args)
 
+        for i in INFO_LOG:
+            logging.info(LOGS[parser_mode].format(*i))
+
     except Exception as e:
-        logging.info(e, stack_info=True)
+        logging.exception(e)
 
     logging.info('Парсер завершил работу.')
-    # logging.info(INFO)
+
 
 if __name__ == '__main__':
     main()
