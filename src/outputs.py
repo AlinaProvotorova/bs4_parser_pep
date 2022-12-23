@@ -6,13 +6,8 @@ from prettytable import PrettyTable
 from constants import DATETIME_FORMAT, RESULTS_DIR
 
 
-<<<<<<< HEAD
 def default_output(*results):
     for row in results[0]:
-=======
-def default_output(results, *args):
-    for row in results:
->>>>>>> 98dbbf3a537b2d978a1ff1171269d86d159fcab3
         print(*row)
 
 
