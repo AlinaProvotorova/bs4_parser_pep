@@ -12,11 +12,6 @@ PEP_URL = 'https://peps.python.org/'
 
 DATETIME_FORMAT = '%Y-%m-%d_%H-%M-%S'
 
-CLI_ARGS = (
-    'pretty',
-    'file'
-)
-
 EXPECTED_STATUS = {
     'A': ('Active', 'Accepted'),
     'D': ('Deferred',),
@@ -28,17 +23,5 @@ EXPECTED_STATUS = {
     '': ('Draft', 'Active'),
 }
 
-ERRORS_MESSAGE = {
-    'get_response': 'Возникла ошибка при загрузке страницы {}',
-    'find_tag': 'Не найден тег {} {}'
-}
-
-INFO_LOG = []
-LOGS = {
-    'download': 'Архив был загружен и сохранён: {}',
-
-    'pep': 'Несовпадающие статусы: \n'
-           '{} \n'
-           'Статус в карточке: {} \n'
-           'Ожидаемые статусы: {}'
-}
+PRETTY = 'pretty'
+FILE = 'file'
