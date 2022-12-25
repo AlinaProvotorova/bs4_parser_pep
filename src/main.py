@@ -7,36 +7,36 @@ import requests_cache
 from tqdm import tqdm
 
 from configs import configure_argument_parser, configure_logging
-from constants import MAIN_DOC_URL, PEP_URL, EXPECTED_STATUS, BASE_DIR
+from constants import MAIN_DOC_URL, PEPS_URL, EXPECTED_STATUS, BASE_DIR
 from outputs import control_output
 from utils import find_tag, get_soup
+
+ERROR_CONNECTION = ("Проблема при загрузке страницы {} \n"
+                    "{}")
 
 
 def whats_new(session):
     errors = []
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
     for section in tqdm(
-            get_soup(
-                session, urljoin(MAIN_DOC_URL, 'whatsnew/')
-            ).select(
-                '#what-s-new-in-python div.toctree-wrapper li.toctree-l1'
-            )
+            get_soup(session, urljoin(MAIN_DOC_URL, 'whatsnew/')
+                     ).select(
+                '#what-s-new-in-python div.toctree-wrapper li.toctree-l1')
     ):
         version_link = urljoin(
             urljoin(MAIN_DOC_URL, 'whatsnew/'),
             find_tag(section, 'a')['href']
         )
-
         try:
             soup = get_soup(session, version_link)
-        except AttributeError as e:
-            errors.append(e)
+        except ConnectionError as e:
+            errors.append(ERROR_CONNECTION.format(version_link, e))
             continue
         results.append((version_link,
                         find_tag(soup, 'h1').text,
                         find_tag(soup, 'dl').text.replace('\n', ' ')))
     for error in errors:
-        logging.error(error)
+        logging.exception(error)
     return results
 
 
@@ -44,9 +44,8 @@ ERROR_VERSIONS = 'Ничего не нашлось'
 
 
 def latest_versions(session):
-    for ul in get_soup(
-            session, MAIN_DOC_URL
-    ).select('div.sphinxsidebarwrapper ul'):
+    for ul in get_soup(session, MAIN_DOC_URL
+                       ).select('div.sphinxsidebarwrapper ul'):
         if 'All versions' in ul.text:
             a_tags = ul.find_all('a')
             break
@@ -94,30 +93,36 @@ LOG_PEP = ('Несовпадающие статусы: \n'
 
 
 def pep(session):
+    errors = []
     info_logs = []
     hrefs = {}
-    for tag in get_soup(
-            session, PEP_URL
-    ).select('section#pep-content tr'):
+    for tag in get_soup(session, PEPS_URL
+                        ).select('section#pep-content tr'):
         href = tag.find('a')
         abbr = tag.find('abbr')
         if href is not None and abbr is not None:
             hrefs[href['href']] = abbr.text[1:]
     status_count = defaultdict(int)
     for href, status in tqdm(set(hrefs.items())):
-        tag_abbr = get_soup(
-            session, urljoin(PEP_URL, href)
-        ).select_one('dl abbr')
+        pep_url = urljoin(PEPS_URL, href)
+        try:
+            tag_abbr = get_soup(session, pep_url
+                                ).select_one('dl abbr')
+        except ConnectionError as e:
+            errors.append(ERROR_CONNECTION.format(pep_url, e))
+            continue
         if tag_abbr.text in EXPECTED_STATUS[status]:
             status_count[tag_abbr.text] += 1
         else:
             info_logs.append(LOG_PEP.format(
-                urljoin(PEP_URL, href),
+                urljoin(PEPS_URL, href),
                 tag_abbr.text,
                 *EXPECTED_STATUS[status]
             ))
     for info in info_logs:
         logging.info(info)
+    for error in errors:
+        logging.error(error)
     return [
         ('Статус', 'Количество'),
         *status_count.items(),

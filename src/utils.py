@@ -16,7 +16,7 @@ def get_response(session, url):
         response.encoding = 'utf-8'
         return response
     except RequestException:
-        raise AttributeError(ERRORS_MESSAGE_RESPONSE.format(url))
+        raise ConnectionError(ERRORS_MESSAGE_RESPONSE.format(url))
 
 
 ERRORS_MESSAGE_TAG = 'Не найден тег {} {}'
