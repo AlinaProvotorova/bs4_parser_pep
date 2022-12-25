@@ -7,8 +7,7 @@ ERRORS_MESSAGE_RESPONSE = 'Возникла ошибка при загрузке
 
 
 def get_soup(session, url):
-    response = get_response(session, url)
-    return BeautifulSoup(response.text, features='lxml')
+    return BeautifulSoup(get_response(session, url).text, features='lxml')
 
 
 def get_response(session, url):
@@ -17,7 +16,7 @@ def get_response(session, url):
         response.encoding = 'utf-8'
         return response
     except RequestException:
-        raise RequestException(ERRORS_MESSAGE_RESPONSE.format(url))
+        raise AttributeError(ERRORS_MESSAGE_RESPONSE.format(url))
 
 
 ERRORS_MESSAGE_TAG = 'Не найден тег {} {}'

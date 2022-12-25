@@ -13,38 +13,45 @@ from utils import find_tag, get_soup
 
 
 def whats_new(session):
-    whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
-    soup = get_soup(session, whats_new_url)
-    main_div = find_tag(soup, 'section', attrs={'id': 'what-s-new-in-python'})
-    div_with_ul = find_tag(main_div, 'div', attrs={'class': 'toctree-wrapper'})
-    sections_by_python = div_with_ul.find_all(
-        'li', attrs={'class': 'toctree-l1'}
-    )
+    errors = []
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, Автор')]
-    for section in tqdm(sections_by_python):
-        version_a_tag = find_tag(section, 'a')
-        href = version_a_tag['href']
-        version_link = urljoin(whats_new_url, href)
-        response, soup = get_soup(session, version_link)
-        h1 = find_tag(soup, 'h1')
-        dl = find_tag(soup, 'dl')
-        dl_text = dl.text.replace('\n', ' ')
-        results.append(
-            (version_link, h1.text, dl_text)
+    for section in tqdm(
+            get_soup(
+                session, urljoin(MAIN_DOC_URL, 'whatsnew/')
+            ).select(
+                '#what-s-new-in-python div.toctree-wrapper li.toctree-l1'
+            )
+    ):
+        version_link = urljoin(
+            urljoin(MAIN_DOC_URL, 'whatsnew/'),
+            find_tag(section, 'a')['href']
         )
+
+        try:
+            soup = get_soup(session, version_link)
+        except AttributeError as e:
+            errors.append(e)
+            continue
+        results.append((version_link,
+                        find_tag(soup, 'h1').text,
+                        find_tag(soup, 'dl').text.replace('\n', ' ')))
+    for error in errors:
+        logging.error(error)
     return results
 
 
+ERROR_VERSIONS = 'Ничего не нашлось'
+
+
 def latest_versions(session):
-    soup = get_soup(session, MAIN_DOC_URL)
-    sidebar = find_tag(soup, 'div', attrs={'class': 'sphinxsidebarwrapper'})
-    ul_tags = sidebar.find_all('ul')
-    for ul in ul_tags:
+    for ul in get_soup(
+            session, MAIN_DOC_URL
+    ).select('div.sphinxsidebarwrapper ul'):
         if 'All versions' in ul.text:
             a_tags = ul.find_all('a')
             break
     else:
-        raise ValueError('Ничего не нашлось')
+        raise ValueError(ERROR_VERSIONS)
     results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
     for a_tag in a_tags:
@@ -63,20 +70,17 @@ LOG_DOWNLOADS = 'Архив был загружен и сохранён: {}'
 
 
 def download(session):
-    soup = get_soup(session, urljoin(MAIN_DOC_URL, 'download.html'))
-    table_tag = find_tag(
-        soup,
-        'table',
-        {'class': 'docutils'}
+    pdf_a4_tag = get_soup(
+        session, urljoin(MAIN_DOC_URL, 'download.html')
+    ).select_one(
+        'table.docutils a[href*="pdf-a4"][href$=".zip"]'
     )
-    pdf_a4_tag = find_tag(table_tag, 'a',
-                          {'href': re.compile(r'.+pdf-a4\.zip$')})
-    pdf_a4_link = pdf_a4_tag['href']
-    archive_url = urljoin(urljoin(MAIN_DOC_URL, 'download.html'), pdf_a4_link)
-    filename = archive_url.split('/')[-1]
+    archive_url = urljoin(
+        urljoin(MAIN_DOC_URL, 'download.html'), pdf_a4_tag['href']
+    )
     DOWNLOADS_DIR = BASE_DIR / 'downloads'
     DOWNLOADS_DIR.mkdir(exist_ok=True)
-    archive_path = DOWNLOADS_DIR / filename
+    archive_path = DOWNLOADS_DIR / archive_url.split('/')[-1]
     response = session.get(archive_url)
     with open(archive_path, 'wb') as file:
         file.write(response.content)
@@ -90,31 +94,30 @@ LOG_PEP = ('Несовпадающие статусы: \n'
 
 
 def pep(session):
-    info = []
-    soup = get_soup(session, PEP_URL)
-    pep_content = find_tag(soup, 'section', {'id': 'pep-content'})
-    tr_tags = pep_content.find_all('tr')
+    info_logs = []
     hrefs = {}
-    for tag in tr_tags:
+    for tag in get_soup(
+            session, PEP_URL
+    ).select('section#pep-content tr'):
         href = tag.find('a')
         abbr = tag.find('abbr')
         if href is not None and abbr is not None:
             hrefs[href['href']] = abbr.text[1:]
     status_count = defaultdict(int)
     for href, status in tqdm(set(hrefs.items())):
-        soup = get_soup(session, urljoin(PEP_URL, href))
-        dl_tag = find_tag(soup, 'dl')
-        tag_abbr = find_tag(dl_tag, 'abbr')
+        tag_abbr = get_soup(
+            session, urljoin(PEP_URL, href)
+        ).select_one('dl abbr')
         if tag_abbr.text in EXPECTED_STATUS[status]:
             status_count[tag_abbr.text] += 1
         else:
-            info.append(LOG_PEP.format(
+            info_logs.append(LOG_PEP.format(
                 urljoin(PEP_URL, href),
                 tag_abbr.text,
                 *EXPECTED_STATUS[status]
             ))
-    for i in info:
-        logging.info(i)
+    for info in info_logs:
+        logging.info(info)
     return [
         ('Статус', 'Количество'),
         *status_count.items(),
@@ -132,13 +135,17 @@ MODE_TO_FUNCTION = {
 ERROR = ('Программа завершилась по причине: \n'
          '{}')
 
+START_LOG = 'Парсер запущен!'
+ARGS_LOG = 'Аргументы командной строки: {}'
+FINISH_LOG = 'Парсер завершил работу.'
+
 
 def main():
     configure_logging()
-    logging.info('Парсер запущен!')
+    logging.info(START_LOG)
     arg_parser = configure_argument_parser(MODE_TO_FUNCTION.keys())
     args = arg_parser.parse_args()
-    logging.info(f'Аргументы командной строки: {args}')
+    logging.info(ARGS_LOG.format(args))
     try:
         session = requests_cache.CachedSession()
         if args.clear_cache:
@@ -149,7 +156,7 @@ def main():
             control_output(results, args)
     except Exception as e:
         logging.exception(ERROR.format(e))
-    logging.info('Парсер завершил работу.')
+    logging.info(FINISH_LOG)
 
 
 if __name__ == '__main__':
